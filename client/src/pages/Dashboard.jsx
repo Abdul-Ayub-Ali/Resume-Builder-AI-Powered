@@ -192,7 +192,7 @@ const Dashboard = () => {
             onClick={() => {
               setShowUploadResume(false);
               setTitle("");
-              setResume(null); // FIXED: Outside click resets state completely
+              setResume(null); 
             }}
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
@@ -309,7 +309,7 @@ const Dashboard = () => {
                 className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors size-6"
                 onClick={() => {
                   setEditResumeId("");
-                  setTitle(""); // FIXED: Properly flushing modal values
+                  setTitle(""); 
                 }}
               />
             </div>
