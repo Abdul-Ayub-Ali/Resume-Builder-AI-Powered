@@ -7,7 +7,6 @@ import {
   Trash2,
   Trash2Icon,
 } from "lucide-react";
-import React from "react";
 
 const ExperienceForm = ({ data, onChange }) => {
   const addExperince = () => {

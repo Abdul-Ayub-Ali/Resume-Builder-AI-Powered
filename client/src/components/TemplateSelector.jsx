@@ -1,5 +1,5 @@
 import { Check, Layout } from "lucide-react";
-import React, { useState } from "react";
+import { useState } from "react";
 
 const TemplateSelector = ({ selectedTemplate, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
