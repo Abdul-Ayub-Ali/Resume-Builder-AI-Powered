@@ -1,18 +1,24 @@
 import {
   Briefcase,
-  Plus,
-  SpaceIcon,
-  Sparkle,
+  Loader2,
+  Plus, 
   Sparkles,
   Trash2,
-  Trash2Icon,
 } from "lucide-react";
+import { useState } from "react";
+import { useSelector } from "react-redux";
+import api from "../config/api";
+import toast from "react-hot-toast";
 
 const ExperienceForm = ({ data, onChange }) => {
+
+  const {token} = useSelector(state => state.auth)
+  const [generatingIndex, setGeneratingIndex] = useState(-1)
+
   const addExperince = () => {
     const newExperience = {
       company: "",
-      poaition: "", // Keeping your original key intact as per logic constraint
+      poaition: "", 
       start_date: "",
       end_date: "",
       description: "",
@@ -32,6 +38,20 @@ const ExperienceForm = ({ data, onChange }) => {
     onChange(updated);
   };
 
+  const generateDescription = async (index) => {
+    setGeneratingIndex(index)
+    const experience = data[index]
+    const prompt = `enhance this job description ${experience.description} for the position of ${experience.position} at ${experience.company}`
+
+    try {
+      const {data} = await api.post("/api/ai/enhance-job-desc",{userContent:prompt},{headers:{Authorization:token}})
+      updateExperience(index,"description" , data.enhancedContent)
+    } catch (error) {
+      toast.error(error.message)
+    }finally{
+      setGeneratingIndex(-1)
+    }
+  }
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -164,11 +184,12 @@ const ExperienceForm = ({ data, onChange }) => {
                   <label className="text-xs font-medium text-gray-600">
                     Job Description
                   </label>
-                  <button 
+                  <button onClick={()=> generateDescription(index)} disabled={generatingIndex === index || !experience.position || !experience.company}
                     type="button"
                     className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100 rounded-lg hover:bg-purple-100 transition-all shadow-sm"
                   >
-                    <Sparkles className="w-3 h-3 text-purple-600" />
+                    {generatingIndex === index ? (<Loader2 className="w-3 h-3 animate-spin"/>) :(<Sparkles className="w-3 h-3 text-purple-600" />)}
+                    
                     <span>Enhance With AI</span>
                   </button>
                 </div>

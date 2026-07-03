@@ -16,7 +16,6 @@ import {
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import PersonalInfoForm from "../components/PersonalInfoForm";
-import { dummyResumeData } from "../assets/assets";
 import ResumePreview from "../components/ResumePreview";
 import TemplateSelector from "../components/TemplateSelector";
 import ColorPicker from "../components/ColorPicker";
@@ -25,10 +24,13 @@ import ExperienceForm from "../components/ExperienceForm";
 import EducationForm from "../components/EducationForm";
 import ProjectForm from "../components/ProjectForm";
 import SkillsForm from "../components/SkillsForm";
+import { useSelector } from "react-redux";
+import api from "../config/api";
+import toast from "react-hot-toast";
 
 const ResumeBuilder = () => {
   const { resumeId } = useParams();
-
+  const { token } = useSelector((state) => state.auth);
   const [resumeData, setResumeData] = useState({
     _id: "",
     title: "",
@@ -37,17 +39,25 @@ const ResumeBuilder = () => {
     experience: "",
     education: [],
     project: [],
-    skills: [], // FIX: 'skill' ko 'skills' kiya taaki niche component se match kare
+    skills: [],
     template: "classic",
     accent_color: "#3B82F6",
     public: false,
   });
 
   const loadExisitingResume = async () => {
-    const resume = dummyResumeData.find((resume) => resume._id === resumeId);
-    if (resume) {
-      setResumeData(resume);
-      document.title = resume.title;
+    try {
+      const { data } = await api.get(`/api/resumes/get/` + resumeId, {
+        headers: {
+          Authorization: token,
+        },
+      });
+      if (data.resume) {
+        setResumeData(data.resume);
+        document.title = data.resume.title;
+      }
+    } catch (error) {
+      console.log(error.message);
     }
   };
 
@@ -69,23 +79,40 @@ const ResumeBuilder = () => {
     loadExisitingResume();
   }, [resumeId]);
 
-  // FIX: Functional update use kiya safely state change karne ke liye
   const changeResumeVisibility = async () => {
-    setResumeData((prev) => ({ ...prev, public: !prev.public }));
+    try {
+      const formData = new FormData();
+      formData.append("resumeId", resumeId);
+      formData.append(
+        "resumeData",
+        JSON.stringify({ public: !resumeData.public }),
+      );
+
+      const { data } = await api.put(`/api/resumes/update`, formData, {
+        headers: {
+          Authorization: token,
+        },
+      });
+      setResumeData({ ...resumeData, public: !resumeData.public });
+      toast.success(data.message);
+    } catch (error) {
+      console.log("Error in saving resume:", error);
+    }
   };
 
-  // FIX: navigation.share ko navigator.share kiya aur URL path sahi kiya
   const handleShare = () => {
     const frontend = window.location.href.split("/app")[0];
     const resumeUrl = frontend + "/view/" + resumeId; // '/' add kiya
 
     if (navigator.share) {
-      navigator.share({ url: resumeUrl, text: "My Resume" })
+      navigator
+        .share({ url: resumeUrl, text: "My Resume" })
         .catch((err) => console.log("Error sharing:", err));
     } else {
-      // Fallback: Agar browser support nahi karta to link copy ho jayegi
       navigator.clipboard.writeText(resumeUrl);
-      alert("Share option not supported on this browser. Link copied to clipboard!");
+      alert(
+        "Share option not supported on this browser. Link copied to clipboard!",
+      );
     }
   };
 
@@ -93,10 +120,36 @@ const ResumeBuilder = () => {
     window.print();
   };
 
+  const saveResume = async () => {
+    try {
+      let updatedResumeData = structuredClone(resumeData);
+      //remove image form updatedResumeData
+      if (typeof resumeData.personal_info.image === "object") {
+        delete updatedResumeData.personal_info.image;
+      }
+      const formData = new FormData();
+      formData.append("resumeId", resumeId);
+      formData.append("resumeData", JSON.stringify(updatedResumeData));
+      removeBackground && formData.append("removeBackground", "yes");
+      typeof resumeData.personal_info.image === "object" &&
+        formData.append("image", resumeData.personal_info.image);
+      const { data } = await api.put("/api/resumes/update", formData, {
+        headers: {
+          Authorization: token,
+        },
+      });
+      setResumeData(data.resume);
+      toast.success(data.message);
+    } catch (error) {
+      console.log("Error saving resume", error);
+    }
+  };
   return (
     <div>
       {/* Top Navigation */}
-      <div className="max-w-7xl mx-auto px-4 py-6 print:hidden"> {/* print:hidden lagaya taaki print me ye na dikhe */}
+      <div className="max-w-7xl mx-auto px-4 py-6 print:hidden">
+        {" "}
+        {/* print:hidden lagaya taaki print me ye na dikhe */}
         <Link
           to={"/app"}
           className="inline-flex gap-2 items-center text-slate-500 hover:text-slate-700 transition-all"
@@ -107,9 +160,10 @@ const ResumeBuilder = () => {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-12 gap-8">
-          
           {/* Left Panel (Form) */}
-          <div className="relative lg:col-span-5 rounded-lg overflow-hidden print:hidden"> {/* print:hidden lagaya */}
+          <div className="relative lg:col-span-5 rounded-lg overflow-hidden print:hidden">
+            {" "}
+            {/* print:hidden lagaya */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 pt-1">
               <hr className="absolute top-0 left-0 right-0 border-2 border-gray-200" />
               <hr
@@ -239,7 +293,7 @@ const ResumeBuilder = () => {
                 )}
               </div>
 
-              <button className="mt-6 flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 active:bg-green-800 border border-transparent rounded-xl shadow-sm hover:shadow transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={()=>{toast.promise(saveResume,{loading:"Saving..." })}} className="mt-6 flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 active:bg-green-800 border border-transparent rounded-xl shadow-sm hover:shadow transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 Save Changes
               </button>
             </div>
@@ -249,7 +303,9 @@ const ResumeBuilder = () => {
           <div className="lg:col-span-7 max-lg:mt-6">
             <div className="relative w-full">
               {/* Action Buttons */}
-              <div className="absolute bottom-3 left-0 right-0 flex items-center justify-end gap-2 print:hidden z-10"> {/* print:hidden aur z-10 lagaya */}
+              <div className="absolute bottom-3 left-0 right-0 flex items-center justify-end gap-2 print:hidden z-10">
+                {" "}
+                {/* print:hidden aur z-10 lagaya */}
                 {resumeData.public && (
                   <button
                     onClick={handleShare}
@@ -278,7 +334,7 @@ const ResumeBuilder = () => {
                 </button>
               </div>
             </div>
-            
+
             {/* Resume Document View */}
             <div className="print:m-0 print:p-0">
               <ResumePreview
@@ -288,7 +344,6 @@ const ResumeBuilder = () => {
               />
             </div>
           </div>
-
         </div>
       </div>
     </div>

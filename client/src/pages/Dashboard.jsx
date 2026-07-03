@@ -1,5 +1,6 @@
 import {
   FilePenIcon,
+  LoaderCircleIcon,
   PencilIcon,
   PlusIcon,
   TrashIcon,
@@ -8,9 +9,13 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { dummyResumeData } from "../assets/assets";
+import { useSelector } from "react-redux";
+import api from "../config/api";
+import toast from "react-hot-toast";
+import pdfToText from "react-pdftotext";
 
 const Dashboard = () => {
+  const { user, token } = useSelector((state) => state.auth);
   const colors = ["#9333ea", "#d97706", "#dc2626", "#0284c7", "#16a34a"];
   const [allResumes, setAllResumes] = useState([]);
   const [showCreateResume, setShowCreateResume] = useState(false);
@@ -18,43 +23,92 @@ const Dashboard = () => {
   const [title, setTitle] = useState("");
   const [resume, setResume] = useState(null);
   const [editResumeId, setEditResumeId] = useState("");
-
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  
+
   const loadAllResumes = async () => {
-    setAllResumes(dummyResumeData);
+    try {
+      const { data } = await api.get("/api/users/resumes", {
+        headers: { Authorization: token },
+      });
+      setAllResumes(data.resumes);
+    } catch (error) {
+      toast.error(error?.respose?.data?.message || error.message);
+    }
   };
 
   const createResume = async (event) => {
-    event.preventDefault();
-    setShowCreateResume(false);
-    setTitle("");
-    navigate(`/app/builder/new`);
+    try {
+      event.preventDefault();
+      const { data } = await api.post(
+        "/api/resumes/create",
+        { title },
+        { headers: { Authorization: token } },
+      );
+      setAllResumes([...allResumes, data.resume]);
+      setTitle("");
+      setShowCreateResume(false);
+      navigate(`/app/builder/${data.resume._id}`);
+    } catch (error) {
+      toast.error(error?.respose?.data?.message || error.message);
+    }
   };
 
   const uploadResume = async (event) => {
     event.preventDefault();
-    setShowUploadResume(false);
-    setTitle("");
-    setResume(null);
-    navigate(`/app/builder/uploaded`);
+    setIsLoading(true);
+    try {
+      const resumeText = await pdfToText(resume);
+      const { data } = await api.post(
+        "/api/ai/upload-resume",
+        { title, resumeText, userId: user?._id },
+        { headers: { Authorization: token } },
+      );
+      setTitle("");
+      setResume(null);
+      setShowUploadResume(false);
+      navigate(`/app/builder/${data.resumeId}`);
+    } catch (error) {
+      toast.error(error?.respose?.data?.message || error.message);
+    }
+    setIsLoading(false);
   };
 
   const editTitle = async (event) => {
-    event.preventDefault();
-    setAllResumes((prev) =>
-      prev.map((res) => (res._id === editResumeId ? { ...res, title: title } : res))
-    );
-    setEditResumeId("");
-    setTitle("");
+    try {
+      event.preventDefault();
+      const { data } = await api.put(
+        "/api/resumes/update",
+        { resumeId: editResumeId, resumeData: { title } },
+        { headers: { Authorization: token } },
+      );
+      setAllResumes(
+        allResumes.map((resume) =>
+          resume._id === editResumeId ? { ...resume, title } : resume,
+        ),
+      );
+      setTitle("");
+      setEditResumeId("");
+      toast.success(data.message);
+    } catch (error) {
+      toast.error(error?.respose?.data?.message || error.message);
+    }
   };
 
   const deleteResume = async (resumeId) => {
-    const confirm = window.confirm(
-      "Are you sure you want to delete this resume?",
-    );
-    if (confirm) {
-      setAllResumes(prev => prev.filter(resume => resume._id !== resumeId));
+    try {
+      const confirm = window.confirm(
+        "Are you sure you want to delete this resume?",
+      );
+      if (confirm) {
+        const { data } = await api.delete(`/api/resumes/delete/${resumeId}`, {
+          headers: { Authorization: token },
+        });
+        setAllResumes(allResumes.filter((resume) => resume._id !== resumeId));
+        toast.success(data.message);
+      }
+    } catch (error) {
+      toast.error(error?.respose?.data?.message || error.message);
     }
   };
 
@@ -121,13 +175,16 @@ const Dashboard = () => {
                 >
                   Updated on {new Date(resume.updatedAt).toLocaleDateString()}
                 </p>
-                
+
                 {/* Action Popovers (Trash / Pencil) */}
                 <div
                   onClick={(e) => e.stopPropagation()}
                   className="absolute top-1 right-1 group-hover:flex items-center hidden z-10"
                 >
-                  <TrashIcon onClick={() => deleteResume(resume._id)} className="size-7 p-1.5 hover:bg-white/50 rounded text-slate-700 transition-colors cursor-pointer" />
+                  <TrashIcon
+                    onClick={() => deleteResume(resume._id)}
+                    className="size-7 p-1.5 hover:bg-white/50 rounded text-slate-700 transition-colors cursor-pointer"
+                  />
                   <PencilIcon
                     onClick={() => {
                       setEditResumeId(resume._id);
@@ -192,7 +249,7 @@ const Dashboard = () => {
             onClick={() => {
               setShowUploadResume(false);
               setTitle("");
-              setResume(null); 
+              setResume(null);
             }}
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
@@ -253,11 +310,14 @@ const Dashboard = () => {
                     )}
                   </label>
                 </div>
-                <button
+                <button disabled={isLoading}
                   type="submit"
-                  className="w-full py-3 bg-green-700 text-white font-semibold rounded-lg hover:bg-green-800 transition-colors duration-200 shadow-md"
+                  className="w-full py-3 bg-green-700 text-white font-semibold rounded-lg hover:bg-green-800 transition-colors duration-200 shadow-md flex items-center justify-center gap-2"
                 >
-                  Upload Resume
+                  {isLoading && (
+                    <LoaderCircleIcon className="animate-spin size-4 text-white" />
+                  )}
+                  {isLoading ? "Uploading..." : "Upload Resume"}
                 </button>
               </div>
               <XIcon
@@ -309,7 +369,7 @@ const Dashboard = () => {
                 className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors size-6"
                 onClick={() => {
                   setEditResumeId("");
-                  setTitle(""); 
+                  setTitle("");
                 }}
               />
             </div>

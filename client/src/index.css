@@ -18,3 +18,26 @@
     @apply outline-none focus:ring border border-gray-300 focus:ring-blue-500 focus:border-blue-500 rounded-lg resize-none
   }
 }
+
+/* ---- Sabse neeche ise bina kisi @layer ke jod dein ---- */
+@media print {
+  /* Poore page ke baaki saare elements ko completely hide karo */
+  body * {
+    visibility: hidden !important;
+  }
+  
+  /* Sirf aapke ResumePreview wale container aur uske children ko force-show karo */
+  .print\:m-0, .print\:m-0 * {
+    visibility: visible !important;
+  }
+  
+  /* Resume ko pure white paper par bina kisi margin ke top-left se chipka do */
+  .print\:m-0 {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
