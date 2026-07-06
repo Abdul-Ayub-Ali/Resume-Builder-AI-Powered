@@ -4,6 +4,14 @@ import userRouter from "./routes/user.routes.js";
 import resumeRouter from "./routes/resume.routes.js";
 import aiRouter from "./routes/ai.routes.js";
 
+const cors = require('cors');
+
+
+app.use(cors({
+    origin: 'https://resume-builder-ai-powered-pi.vercel.app/', 
+    credentials: true, 
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], 
+}));
 const app = express();
 
 // Middlewares
